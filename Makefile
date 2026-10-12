@@ -1,10 +1,13 @@
 # ==============================================================================
 # LogiSAT: Digital Logic Circuit Equivalence & Fault Verifier
 # Makefile - Cross-Platform (Windows MinGW / Linux / macOS)
+# Includes Official Google Test (gTest) Automation
 # ==============================================================================
 
 CC       := gcc
+CXX      := g++
 CFLAGS   := -Wall -Wextra -pedantic -std=c99 -O2
+CXXFLAGS := -Wall -Wextra -std=gnu++11 -O2 -DGTEST_HAS_PTHREAD=0
 INCLUDES := -Iinclude
 
 SRC_DIR   := src
@@ -13,8 +16,10 @@ TEST_DIR  := test
 BUILD_DIR := build
 BIN_DIR   := bin
 OUT_DIR   := output
+GTEST_DIR := external/googletest/googletest
+GTEST_LIB := external/googletest/libgtest.a
 
-# Core library source files (excluding main.c)
+# Core C library sources
 CORE_SRCS := $(SRC_DIR)/cnf.c \
              $(SRC_DIR)/dimacs.c \
              $(SRC_DIR)/netlist.c \
@@ -29,19 +34,17 @@ CORE_OBJS := $(patsubst $(SRC_DIR)/%.c,$(BUILD_DIR)/%.o,$(CORE_SRCS))
 MAIN_SRC  := $(SRC_DIR)/main.c
 MAIN_OBJ  := $(BUILD_DIR)/main.o
 
-TEST_SRC  := $(TEST_DIR)/test_runner.c
+TEST_SRC  := $(TEST_DIR)/test_runner.cpp
 TEST_OBJ  := $(BUILD_DIR)/test_runner.o
 
 # Platform specifics
 ifeq ($(OS),Windows_NT)
     TARGET_EXT := .exe
     RM_CMD     := del /Q /F
-    FIX_PATH    = $(subst /,\,$1)
     DIR_GUARD   = if not exist "$(@D)" mkdir "$(@D)"
 else
     TARGET_EXT :=
     RM_CMD     := rm -f
-    FIX_PATH    = $1
     DIR_GUARD   = mkdir -p $(@D)
 endif
 
@@ -53,14 +56,23 @@ TEST_TARGET := $(BIN_DIR)/test_runner$(TARGET_EXT)
 # Default rule
 all: $(TARGET)
 
-# Object files compilation with automatic directory creation
+# Compile C sources
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	@$(DIR_GUARD)
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
-$(BUILD_DIR)/test_runner.o: $(TEST_DIR)/test_runner.c
+# Build official Google Test static library if missing
+$(GTEST_LIB):
+	@echo [BUILDING] Official Google Test archive...
+	$(CXX) $(CXXFLAGS) -I$(GTEST_DIR)/include -I$(GTEST_DIR) -c $(GTEST_DIR)/src/gtest-all.cc -o external/googletest/gtest-all.o
+	$(CXX) $(CXXFLAGS) -I$(GTEST_DIR)/include -I$(GTEST_DIR) -c $(GTEST_DIR)/src/gtest_main.cc -o external/googletest/gtest_main.o
+	ar rcs $(GTEST_LIB) external/googletest/gtest-all.o external/googletest/gtest_main.o
+	@echo [OK] Built Google Test library: $(GTEST_LIB)
+
+# Compile C++ Google Test runner
+$(BUILD_DIR)/test_runner.o: $(TEST_SRC)
 	@$(DIR_GUARD)
-	$(CC) $(CFLAGS) $(INCLUDES) -I$(TEST_DIR) -c $< -o $@
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -I$(GTEST_DIR)/include -c $< -o $@
 
 # Executable target
 $(TARGET): $(CORE_OBJS) $(MAIN_OBJ)
@@ -68,15 +80,15 @@ $(TARGET): $(CORE_OBJS) $(MAIN_OBJ)
 	$(CC) $(CFLAGS) $^ -o $@
 	@echo [OK] Built executable: $@
 
-# Test executable target
-$(TEST_TARGET): $(CORE_OBJS) $(TEST_OBJ)
+# Google Test executable target
+$(TEST_TARGET): $(CORE_OBJS) $(TEST_OBJ) $(GTEST_LIB)
 	@$(DIR_GUARD)
-	$(CC) $(CFLAGS) $^ -o $@
-	@echo [OK] Built test runner: $@
+	$(CXX) $(CXXFLAGS) $^ -o $@
+	@echo [OK] Built Google Test runner: $@
 
-# Run test suite
+# Run Google Test suite
 test: $(TEST_TARGET)
-	@echo [RUNNING] Executing LogiSAT Unit Test Suite...
+	@echo [RUNNING] Executing Official Google Test (gTest) Suite...
 	@$(TEST_TARGET)
 
 # Benchmark / Demonstration run
@@ -110,7 +122,7 @@ help:
 	@echo  LogiSAT Build Automation Helper
 	@echo ----------------------------------------------------------------------
 	@echo  make               : Build the main LogiSAT binary
-	@echo  make test          : Build and execute automated Google Test unit tests
+	@echo  make test          : Build and execute Official Google Test suite
 	@echo  make benchmark     : Run demonstration benchmarks and emit reports
 	@echo  make clean         : Remove compiled objects and binaries
 	@echo  make clean-output  : Delete generated verification and report files

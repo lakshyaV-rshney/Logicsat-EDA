@@ -3,6 +3,8 @@ build/
 bin/
 *.o
 *.exe
+external/googletest/*.o
+external/googletest/*.a
 
 # Verification output files and reports
 output/
