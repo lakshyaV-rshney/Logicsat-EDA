@@ -1,0 +1,20 @@
+# -------------------------------------------------------------
+# 1-Bit Full Adder (Defective Mutant Circuit with Bug)
+# Bug: Carry gate mutated to AND instead of OR
+# -------------------------------------------------------------
+CIRCUIT full_adder_buggy
+INPUT a b cin
+OUTPUT sum cout
+
+# Sum logic
+GATE s_xor1 XOR s_t1 a b
+GATE s_xor2 XOR sum s_t1 cin
+
+# Buggy Carry logic
+GATE c_and1 AND c_m1 a b
+GATE c_and2 AND c_m2 b cin
+GATE c_and3 AND c_m3 a cin
+GATE c_or1  OR  c_t1 c_m1 c_m2
+GATE c_bug  AND cout c_t1 c_m3
+
+END

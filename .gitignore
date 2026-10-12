@@ -1,0 +1,16 @@
+# Build artifacts
+build/
+bin/
+*.o
+*.exe
+
+# Verification output files and reports
+output/
+*.rep
+*.out
+tmp_test*
+
+# Editor directories
+.vscode/
+.idea/
+*.swp

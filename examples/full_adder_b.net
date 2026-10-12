@@ -1,0 +1,22 @@
+# -------------------------------------------------------------
+# 1-Bit Full Adder (Synthesized / Transformed Architecture)
+# Inputs: a, b, cin
+# Outputs: sum, cout
+# Carry implemented via 3-term majority gate: (a&b) | (b&cin) | (a&cin)
+# -------------------------------------------------------------
+CIRCUIT full_adder_syn
+INPUT a b cin
+OUTPUT sum cout
+
+# Sum logic
+GATE s_xor1 XOR s_t1 a b
+GATE s_xor2 XOR sum s_t1 cin
+
+# Carry majority logic
+GATE c_and1 AND c_m1 a b
+GATE c_and2 AND c_m2 b cin
+GATE c_and3 AND c_m3 a cin
+GATE c_or1  OR  c_t1 c_m1 c_m2
+GATE c_or2  OR  cout c_t1 c_m3
+
+END

@@ -1,0 +1,19 @@
+# -------------------------------------------------------------
+# 1-Bit Full Adder (Golden Reference Architecture)
+# Inputs: a, b, cin
+# Outputs: sum, cout
+# -------------------------------------------------------------
+CIRCUIT full_adder_ref
+INPUT a b cin
+OUTPUT sum cout
+
+# Sum logic: sum = (a ^ b) ^ cin
+GATE g_xor1 XOR n_ab a b
+GATE g_xor2 XOR sum n_ab cin
+
+# Carry logic: cout = (a & b) | (cin & (a ^ b))
+GATE g_and1 AND n_ab_and a b
+GATE g_and2 AND n_cin_and cin n_ab
+GATE g_or1  OR  cout n_ab_and n_cin_and
+
+END
