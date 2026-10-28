@@ -1,0 +1,16 @@
+# -------------------------------------------------------------
+# 2-to-1 Multiplexer (Circuit A: Standard AND-OR-NOT Design)
+# Inputs: s (select line), d0 (data 0), d1 (data 1)
+# Output: y
+# Equation: y = (~s & d0) | (s & d1)
+# -------------------------------------------------------------
+CIRCUIT mux2to1_ref
+INPUT s d0 d1
+OUTPUT y
+
+GATE g_inv   NOT s_not s
+GATE g_and0  AND t0 d0 s_not
+GATE g_and1  AND t1 d1 s
+GATE g_or    OR  y  t0 t1
+
+END

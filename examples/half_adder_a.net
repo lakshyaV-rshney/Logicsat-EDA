@@ -1,0 +1,16 @@
+# -------------------------------------------------------------
+# Half Adder Circuit A: Golden Reference Architecture
+# Inputs: a, b
+# Outputs: sum, cout
+# Equations:
+#   sum  = a ^ b
+#   cout = a & b
+# -------------------------------------------------------------
+CIRCUIT half_adder_ref
+INPUT a b
+OUTPUT sum cout
+
+GATE g_xor XOR sum a b
+GATE g_and AND cout a b
+
+END

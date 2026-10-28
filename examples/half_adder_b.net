@@ -1,0 +1,23 @@
+# -------------------------------------------------------------
+# Half Adder Circuit B: Universal NAND Gate Implementation
+# Standard 2nd Year Digital Electronics Lab Experiment
+# Inputs: a, b
+# Outputs: sum, cout
+# Constructed entirely from 5 two-input NAND gates:
+#   n1   = NAND(a, b)
+#   n2   = NAND(a, n1)
+#   n3   = NAND(b, n1)
+#   sum  = NAND(n2, n3)  (Equivalent to a ^ b)
+#   cout = NAND(n1, n1)  (Equivalent to a & b)
+# -------------------------------------------------------------
+CIRCUIT half_adder_nand
+INPUT a b
+OUTPUT sum cout
+
+GATE g_nand1 NAND n1 a b
+GATE g_nand2 NAND n2 a n1
+GATE g_nand3 NAND n3 b n1
+GATE g_sum   NAND sum n2 n3
+GATE g_cout  NAND cout n1 n1
+
+END

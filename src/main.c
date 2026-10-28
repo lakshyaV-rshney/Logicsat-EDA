@@ -15,299 +15,170 @@
 static void print_banner(void) {
     printf("======================================================================\n");
     printf("  LogiSAT: Digital Logic Equivalence & Fault Verifier (DPLL-EDA)     \n");
-    printf("  Automated Software Engineering System - Mini Project Submission     \n");
+    printf("  Mini Project (SY B.Tech Semester 3/4 Demonstration Edition)        \n");
     printf("======================================================================\n\n");
 }
 
-static void print_usage(const char *prog_name) {
-    printf("Usage: %s [options]\n\n", prog_name);
+static void print_usage(const char *prog) {
+    printf("Usage: %s [mode] [args] [--output rep.txt] [-v|--verbose]\n\n", prog);
     printf("Modes:\n");
-    printf("  --dimacs <file.cnf> [--output <rep.txt>]         Solve a DIMACS CNF SAT problem\n");
-    printf("  --equiv <c1.net> <c2.net> [--output <rep.txt>]  Check combinational equivalence (CEC)\n");
-    printf("  --fault <c.net> <net> <0|1> [--output <rep.txt>] Generate test pattern for stuck-at fault\n");
-    printf("  --to-cnf <c.net> <out.cnf>                      Convert netlist to DIMACS CNF\n");
-    printf("  --help                                          Display this help manual\n\n");
-    printf("Running '%s' without flags launches interactive engineer mode.\n", prog_name);
+    printf("  --equiv <c1.net> <c2.net>   Combinational Equivalence Checking (CEC)\n");
+    printf("  --fault <c.net> <wire> <0|1> Generate ATPG test vector for stuck-at fault\n");
+    printf("  --explain <c.net>           Analyze netlist DAG and show Tseytin CNF clauses\n");
+    printf("  --dimacs <file.cnf>         Solve standard DIMACS CNF SAT problem\n");
+    printf("  --to-cnf <c.net> <out.cnf>  Convert circuit netlist to DIMACS CNF\n");
+    printf("  --help, -h                  Display this help manual\n\n");
+    printf("Running '%s' without flags launches the interactive engineer terminal.\n", prog);
 }
 
-static void run_dimacs_mode(const char *dimacs_path, const char *output_rep) {
-    printf("[*] Loading DIMACS CNF file: %s ...\n", dimacs_path);
-    cnf_formula_t *formula = NULL;
-    logisat_status_t st = dimacs_load_from_file(dimacs_path, &formula);
-    if (st != LOGISAT_OK) {
-        fprintf(stderr, "[!] Error loading DIMACS file: %s\n", logisat_status_to_string(st));
+static void run_explain_mode(const char *path) {
+    netlist_t *nl = NULL;
+    if (parser_parse_netlist_file(path, &nl) != LOGISAT_OK) {
+        fprintf(stderr, "[!] Failed to parse circuit: %s\n", path);
         return;
     }
+    printf("\n--- CIRCUIT: %s (Inputs: %zu, Outputs: %zu, Gates: %zu) ---\n",
+           nl->name, nl->num_primary_inputs, nl->num_primary_outputs, nl->num_gates);
+    printf("DAG Cycle Check: %s\n", netlist_validate_acyclic(nl) == LOGISAT_OK ? "PASS (Acyclic feedforward DAG)" : "FAIL (Cycle detected!)");
 
-    printf("    Variables: %zu, Clauses: %zu\n", formula->num_vars, formula->num_clauses);
-    printf("[*] Solving formula via DPLL engine ...\n");
+    cnf_formula_t *f = cnf_formula_create(nl->num_nets, nl->num_gates * 4);
+    tseytin_encode_netlist(nl, f, NULL);
+    printf("Tseytin CNF Formula: %zu Variables, %zu Clauses\n", f->num_vars, f->num_clauses);
+    for (size_t i = 0; i < f->num_clauses && i < 15; ++i) {
+        printf("  Clause %2zu: ( ", i + 1);
+        for (size_t j = 0; j < f->clauses[i]->size; ++j) {
+            int32_t lit = f->clauses[i]->literals[j];
+            printf("%s%s ", lit < 0 ? "~" : "", netlist_get_net_name(nl, lit > 0 ? lit : -lit));
+            if (j + 1 < f->clauses[i]->size) printf("v ");
+        }
+        printf(")\n");
+    }
+    if (f->num_clauses > 15) printf("  ... [%zu clauses total]\n", f->num_clauses);
+    cnf_formula_destroy(f);
+    netlist_destroy(nl);
+}
 
-    var_value_t *assignments = (var_value_t *)calloc(formula->num_vars + 1, sizeof(var_value_t));
+static void run_equiv_mode(const char *c1, const char *c2, const char *rep, bool verb) {
+    netlist_t *nl1 = NULL, *nl2 = NULL;
+    if (parser_parse_netlist_file(c1, &nl1) || parser_parse_netlist_file(c2, &nl2)) {
+        fprintf(stderr, "[!] Parse error in input netlists\n");
+        netlist_destroy(nl1); netlist_destroy(nl2); return;
+    }
+
+    printf("[*] Equivalence Checking: %s vs %s (verbose=%s)\n", c1, c2, verb ? "ON" : "OFF");
+    cec_result_t res;
+    solver_config_t cfg = solver_config_default();
+    cfg.verbose = verb;
+
+    if (verifier_check_equivalence(nl1, nl2, &cfg, &res) == LOGISAT_OK) {
+        printf("\n========================================================\n");
+        printf("  VERDICT: %s\n", res.is_equivalent ? "EQUIVALENT [PROVEN - UNSAT]" : "NON-EQUIVALENT [DISPROVEN - SAT]");
+        printf("========================================================\n");
+        if (!res.is_equivalent) {
+            printf("Counterexample: ");
+            for (size_t i = 0; i < res.num_inputs; ++i)
+                printf("%s=%d ", res.input_names[i], res.counterexample_inputs[i] == VAL_TRUE ? 1 : 0);
+            printf("\n");
+        }
+        printf("Metrics: Time: %.3f ms | Decisions: %llu | Backtracks: %llu\n",
+               res.stats.solve_time_ms, (unsigned long long)res.stats.num_decisions, (unsigned long long)res.stats.num_backtracks);
+        if (rep) { reporter_write_cec_report(rep, nl1, nl2, &res); printf("[+] Report saved: %s\n", rep); }
+        verifier_free_cec_result(&res);
+    }
+    netlist_destroy(nl1); netlist_destroy(nl2);
+}
+
+static void run_fault_mode(const char *c, const char *net, int fval, const char *rep, bool verb) {
+    netlist_t *nl = NULL;
+    if (parser_parse_netlist_file(c, &nl) != LOGISAT_OK) { fprintf(stderr, "[!] Parse error: %s\n", c); return; }
+
+    printf("[*] ATPG Stuck-At-%d on net '%s' (verbose=%s)\n", fval, net, verb ? "ON" : "OFF");
+    atpg_result_t res;
+    solver_config_t cfg = solver_config_default();
+    cfg.verbose = verb;
+
+    if (verifier_generate_test_pattern(nl, net, fval ? FAULT_STUCK_AT_1 : FAULT_STUCK_AT_0, &cfg, &res) == LOGISAT_OK) {
+        printf("\n========================================================\n");
+        printf("  VERDICT: %s\n", res.is_testable ? "FAULT IS TESTABLE [SAT]" : "REDUNDANT / UNDETECTABLE [UNSAT]");
+        printf("========================================================\n");
+        if (res.is_testable) {
+            printf("Test Vector: ");
+            for (size_t i = 0; i < res.num_inputs; ++i)
+                printf("%s=%d ", res.input_names[i], res.test_vector[i] == VAL_TRUE ? 1 : 0);
+            printf("\n");
+        }
+        printf("Metrics: Time: %.3f ms | Decisions: %llu | Backtracks: %llu\n",
+               res.stats.solve_time_ms, (unsigned long long)res.stats.num_decisions, (unsigned long long)res.stats.num_backtracks);
+        if (rep) { reporter_write_atpg_report(rep, nl, net, fval ? FAULT_STUCK_AT_1 : FAULT_STUCK_AT_0, &res); printf("[+] Report saved: %s\n", rep); }
+        verifier_free_atpg_result(&res);
+    }
+    netlist_destroy(nl);
+}
+
+static void run_dimacs_mode(const char *path, const char *rep, bool verb) {
+    cnf_formula_t *f = NULL;
+    if (dimacs_load_from_file(path, &f) != LOGISAT_OK) { fprintf(stderr, "[!] Load error: %s\n", path); return; }
+
+    printf("[*] Solving DIMACS: %s (%zu vars, %zu clauses)\n", path, f->num_vars, f->num_clauses);
+    var_value_t *assign = (var_value_t *)calloc(f->num_vars + 1, sizeof(var_value_t));
     solver_stats_t stats;
     solver_config_t cfg = solver_config_default();
+    cfg.verbose = verb;
 
-    solver_result_t res = solver_solve(formula, &cfg, assignments, &stats);
+    solver_result_t res = solver_solve(f, &cfg, assign, &stats);
+    printf(">>> RESULT: %s <<<\n", res == SOLVER_SAT ? "SATISFIABLE (SAT)" : "UNSATISFIABLE (UNSAT)");
+    printf("Metrics: Time: %.3f ms | Decisions: %llu | Backtracks: %llu\n",
+           stats.solve_time_ms, (unsigned long long)stats.num_decisions, (unsigned long long)stats.num_backtracks);
 
-    if (res == SOLVER_SAT) {
-        printf("\n>>> RESULT: SATISFIABLE (SAT) <<<\n");
-        printf("Satisfying model: ");
-        size_t show_count = formula->num_vars < 15 ? formula->num_vars : 15;
-        for (size_t i = 1; i <= show_count; ++i) {
-            printf("%d ", assignments[i] == VAL_TRUE ? (int)i : -(int)i);
-        }
-        if (formula->num_vars > 15) printf("... [truncated]");
-        printf(" 0\n");
-    } else {
-        printf("\n>>> RESULT: UNSATISFIABLE (UNSAT) <<<\n");
-    }
-
-    printf("\nExecution Statistics:\n");
-    printf("  Solve Time          : %.3f ms\n", stats.solve_time_ms);
-    printf("  Decisions           : %llu\n", (unsigned long long)stats.num_decisions);
-    printf("  Backtracks          : %llu\n", (unsigned long long)stats.num_backtracks);
-    printf("  Unit Propagations   : %llu\n", (unsigned long long)stats.num_unit_propagations);
-    printf("  Pure Literals       : %llu\n", (unsigned long long)stats.num_pure_literals);
-
-    if (output_rep) {
-        reporter_write_dimacs_summary(output_rep, dimacs_path, formula, res, &stats, assignments);
-        printf("[+] Diagnostic report written to: %s\n", output_rep);
-    }
-
-    free(assignments);
-    cnf_formula_destroy(formula);
+    if (rep) { reporter_write_dimacs_summary(rep, path, f, res, &stats, assign); printf("[+] Report saved: %s\n", rep); }
+    free(assign); cnf_formula_destroy(f);
 }
 
-static void run_equiv_mode(const char *c1_path, const char *c2_path, const char *output_rep) {
-    printf("[*] Parsing Circuit 1: %s ...\n", c1_path);
-    netlist_t *nl1 = NULL;
-    logisat_status_t st1 = parser_parse_netlist_file(c1_path, &nl1);
-    if (st1 != LOGISAT_OK) {
-        fprintf(stderr, "[!] Parse error in %s: %s\n", c1_path, logisat_status_to_string(st1));
-        return;
-    }
-
-    printf("[*] Parsing Circuit 2: %s ...\n", c2_path);
-    netlist_t *nl2 = NULL;
-    logisat_status_t st2 = parser_parse_netlist_file(c2_path, &nl2);
-    if (st2 != LOGISAT_OK) {
-        fprintf(stderr, "[!] Parse error in %s: %s\n", c2_path, logisat_status_to_string(st2));
-        netlist_destroy(nl1);
-        return;
-    }
-
-    printf("[*] Constructing Miter circuit and solving equivalence ...\n");
-    cec_result_t cec_res;
-    solver_config_t cfg = solver_config_default();
-    logisat_status_t st = verifier_check_equivalence(nl1, nl2, &cfg, &cec_res);
-
-    if (st != LOGISAT_OK) {
-        fprintf(stderr, "[!] Verification error: %s\n", logisat_status_to_string(st));
-        netlist_destroy(nl1);
-        netlist_destroy(nl2);
-        return;
-    }
-
-    if (cec_res.is_equivalent) {
-        printf("\n========================================================\n");
-        printf("  VERDICT: CIRCUITS ARE FUNCTIONALLY EQUIVALENT [PROVEN] \n");
-        printf("========================================================\n");
-    } else {
-        printf("\n========================================================\n");
-        printf("  VERDICT: CIRCUITS ARE NON-EQUIVALENT [DISPROVEN]      \n");
-        printf("========================================================\n");
-        printf("Counterexample input vector found:\n");
-        for (size_t i = 0; i < cec_res.num_inputs; ++i) {
-            printf("  %s = %d\n", cec_res.input_names[i], cec_res.counterexample_inputs[i] == VAL_TRUE ? 1 : 0);
-        }
-    }
-
-    printf("\nMetrics: Time: %.3f ms | Decisions: %llu | Backtracks: %llu\n",
-           cec_res.stats.solve_time_ms,
-           (unsigned long long)cec_res.stats.num_decisions,
-           (unsigned long long)cec_res.stats.num_backtracks);
-
-    if (output_rep) {
-        reporter_write_cec_report(output_rep, nl1, nl2, &cec_res);
-        printf("[+] Verification report exported to: %s\n", output_rep);
-    }
-
-    verifier_free_cec_result(&cec_res);
-    netlist_destroy(nl1);
-    netlist_destroy(nl2);
-}
-
-static void run_fault_mode(const char *c_path, const char *target_net, int fault_val, const char *output_rep) {
-    printf("[*] Parsing Circuit: %s ...\n", c_path);
+static void run_to_cnf_mode(const char *in_path, const char *out_path) {
     netlist_t *nl = NULL;
-    logisat_status_t st = parser_parse_netlist_file(c_path, &nl);
-    if (st != LOGISAT_OK) {
-        fprintf(stderr, "[!] Parse error: %s\n", logisat_status_to_string(st));
-        return;
-    }
-
-    fault_type_t ftype = (fault_val == 0) ? FAULT_STUCK_AT_0 : FAULT_STUCK_AT_1;
-    printf("[*] Testing stuck-at-%d fault on net '%s' ...\n", fault_val, target_net);
-
-    atpg_result_t atpg_res;
-    solver_config_t cfg = solver_config_default();
-    st = verifier_generate_test_pattern(nl, target_net, ftype, &cfg, &atpg_res);
-
-    if (st != LOGISAT_OK) {
-        fprintf(stderr, "[!] ATPG error: %s\n", logisat_status_to_string(st));
-        netlist_destroy(nl);
-        return;
-    }
-
-    if (atpg_res.is_testable) {
-        printf("\n========================================================\n");
-        printf("  VERDICT: FAULT IS TESTABLE                            \n");
-        printf("========================================================\n");
-        printf("Test pattern vector:\n");
-        for (size_t i = 0; i < atpg_res.num_inputs; ++i) {
-            printf("  %s = %d\n", atpg_res.input_names[i], atpg_res.test_vector[i] == VAL_TRUE ? 1 : 0);
-        }
-    } else {
-        printf("\n========================================================\n");
-        printf("  VERDICT: REDUNDANT / UNDETECTABLE FAULT               \n");
-        printf("========================================================\n");
-    }
-
-    printf("\nMetrics: Time: %.3f ms | Decisions: %llu | Backtracks: %llu\n",
-           atpg_res.stats.solve_time_ms,
-           (unsigned long long)atpg_res.stats.num_decisions,
-           (unsigned long long)atpg_res.stats.num_backtracks);
-
-    if (output_rep) {
-        reporter_write_atpg_report(output_rep, nl, target_net, ftype, &atpg_res);
-        printf("[+] ATPG report exported to: %s\n", output_rep);
-    }
-
-    verifier_free_atpg_result(&atpg_res);
-    netlist_destroy(nl);
-}
-
-static void run_to_cnf_mode(const char *c_path, const char *out_cnf) {
-    printf("[*] Parsing Circuit: %s ...\n", c_path);
-    netlist_t *nl = NULL;
-    logisat_status_t st = parser_parse_netlist_file(c_path, &nl);
-    if (st != LOGISAT_OK) {
-        fprintf(stderr, "[!] Parse error: %s\n", logisat_status_to_string(st));
-        return;
-    }
-
-    printf("[*] Applying Tseytin Transformation ...\n");
-    cnf_formula_t *formula = cnf_formula_create(nl->num_nets, nl->num_gates * 4);
-    st = tseytin_encode_netlist(nl, formula, NULL);
-    if (st != LOGISAT_OK) {
-        fprintf(stderr, "[!] Transform error: %s\n", logisat_status_to_string(st));
-        cnf_formula_destroy(formula);
-        netlist_destroy(nl);
-        return;
-    }
-
-    st = dimacs_save_to_file(out_cnf, formula, nl->name);
-    if (st == LOGISAT_OK) {
-        printf("[+] Exported DIMACS CNF to: %s (%zu variables, %zu clauses)\n",
-               out_cnf, formula->num_vars, formula->num_clauses);
-    } else {
-        fprintf(stderr, "[!] Error saving DIMACS file: %s\n", logisat_status_to_string(st));
-    }
-
-    cnf_formula_destroy(formula);
-    netlist_destroy(nl);
+    if (parser_parse_netlist_file(in_path, &nl) != LOGISAT_OK) return;
+    cnf_formula_t *f = cnf_formula_create(nl->num_nets, nl->num_gates * 4);
+    tseytin_encode_netlist(nl, f, NULL);
+    dimacs_save_to_file(out_path, f, nl->name);
+    printf("[+] Exported %zu variables and %zu clauses to %s\n", f->num_vars, f->num_clauses, out_path);
+    cnf_formula_destroy(f); netlist_destroy(nl);
 }
 
 static void run_interactive_mode(void) {
     print_banner();
-    printf("Interactive Engineering Menu:\n");
-    printf("1. Solve DIMACS CNF benchmark file\n");
-    printf("2. Check Combinational Equivalence between two netlists\n");
-    printf("3. Generate Stuck-At Fault test pattern (ATPG)\n");
-    printf("4. Convert Netlist to DIMACS CNF\n");
-    printf("5. Exit\n\n");
-    printf("Select option [1-5]: ");
-
+    printf("Menu:\n1. Solve DIMACS CNF\n2. Equivalence Check (CEC)\n3. Stuck-At ATPG\n4. Convert to CNF\n5. Explain Circuit\n6. Exit\nChoice [1-6]: ");
     int choice = 0;
     if (scanf("%d", &choice) != 1) return;
+    char f1[256], f2[256], net[64], v[8];
+    int fval = 0; bool verb = false;
 
-    char file1[256], file2[256], rep[256], net[64];
-    int fault_val = 0;
-
+    if (choice >= 1 && choice <= 3) {
+        printf("Verbose step-by-step trace? (y/n): "); scanf("%7s", v); verb = (v[0] == 'y' || v[0] == 'Y');
+    }
     switch (choice) {
-        case 1:
-            printf("Enter DIMACS CNF file path: ");
-            scanf("%255s", file1);
-            printf("Enter output report path (or '-' to skip): ");
-            scanf("%255s", rep);
-            run_dimacs_mode(file1, strcmp(rep, "-") == 0 ? NULL : rep);
-            break;
-        case 2:
-            printf("Enter Circuit 1 path: ");
-            scanf("%255s", file1);
-            printf("Enter Circuit 2 path: ");
-            scanf("%255s", file2);
-            printf("Enter output report path (or '-' to skip): ");
-            scanf("%255s", rep);
-            run_equiv_mode(file1, file2, strcmp(rep, "-") == 0 ? NULL : rep);
-            break;
-        case 3:
-            printf("Enter Circuit path: ");
-            scanf("%255s", file1);
-            printf("Enter target net name: ");
-            scanf("%63s", net);
-            printf("Enter stuck-at value (0 or 1): ");
-            scanf("%d", &fault_val);
-            printf("Enter output report path (or '-' to skip): ");
-            scanf("%255s", rep);
-            run_fault_mode(file1, net, fault_val, strcmp(rep, "-") == 0 ? NULL : rep);
-            break;
-        case 4:
-            printf("Enter Netlist path: ");
-            scanf("%255s", file1);
-            printf("Enter destination CNF path: ");
-            scanf("%255s", file2);
-            run_to_cnf_mode(file1, file2);
-            break;
-        default:
-            printf("Exiting.\n");
-            break;
+        case 1: printf("File: "); scanf("%255s", f1); run_dimacs_mode(f1, NULL, verb); break;
+        case 2: printf("Circuit 1: "); scanf("%255s", f1); printf("Circuit 2: "); scanf("%255s", f2); run_equiv_mode(f1, f2, NULL, verb); break;
+        case 3: printf("Circuit: "); scanf("%255s", f1); printf("Net: "); scanf("%63s", net); printf("Stuck-at (0/1): "); scanf("%d", &fval); run_fault_mode(f1, net, fval, NULL, verb); break;
+        case 4: printf("Netlist: "); scanf("%255s", f1); printf("Output CNF: "); scanf("%255s", f2); run_to_cnf_mode(f1, f2); break;
+        case 5: printf("Circuit: "); scanf("%255s", f1); run_explain_mode(f1); break;
+        default: break;
     }
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        run_interactive_mode();
-        return 0;
-    }
-
-    const char *rep_file = NULL;
+    if (argc < 2) { run_interactive_mode(); return 0; }
+    const char *rep = NULL; bool verb = false;
     for (int i = 1; i < argc; ++i) {
-        if (strcmp(argv[i], "--output") == 0 && i + 1 < argc) {
-            rep_file = argv[i + 1];
-            break;
-        }
+        if (!strcmp(argv[i], "--output") && i + 1 < argc) rep = argv[++i];
+        if (!strcmp(argv[i], "-v") || !strcmp(argv[i], "--verbose")) verb = true;
     }
 
-    if (strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
-        print_banner();
-        print_usage(argv[0]);
-        return 0;
-    } else if (strcmp(argv[1], "--dimacs") == 0 && argc >= 3) {
-        run_dimacs_mode(argv[2], rep_file);
-        return 0;
-    } else if (strcmp(argv[1], "--equiv") == 0 && argc >= 4) {
-        run_equiv_mode(argv[2], argv[3], rep_file);
-        return 0;
-    } else if (strcmp(argv[1], "--fault") == 0 && argc >= 5) {
-        int fval = atoi(argv[4]);
-        run_fault_mode(argv[2], argv[3], fval, rep_file);
-        return 0;
-    } else if (strcmp(argv[1], "--to-cnf") == 0 && argc >= 4) {
-        run_to_cnf_mode(argv[2], argv[3]);
-        return 0;
-    } else {
-        fprintf(stderr, "Unknown or invalid command options.\n\n");
-        print_usage(argv[0]);
-        return 1;
-    }
+    if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")) { print_banner(); print_usage(argv[0]); }
+    else if (!strcmp(argv[1], "--explain") && argc >= 3) run_explain_mode(argv[2]);
+    else if (!strcmp(argv[1], "--equiv") && argc >= 4) run_equiv_mode(argv[2], argv[3], rep, verb);
+    else if (!strcmp(argv[1], "--fault") && argc >= 5) run_fault_mode(argv[2], argv[3], atoi(argv[4]), rep, verb);
+    else if (!strcmp(argv[1], "--dimacs") && argc >= 3) run_dimacs_mode(argv[2], rep, verb);
+    else if (!strcmp(argv[1], "--to-cnf") && argc >= 4) run_to_cnf_mode(argv[2], argv[3]);
+    else { print_usage(argv[0]); return 1; }
+    return 0;
 }

@@ -1,0 +1,17 @@
+# -------------------------------------------------------------
+# 2-to-1 Multiplexer (Circuit B: All-NAND Synthesized Design)
+# Standard 2nd Year Digital Electronics Lab Experiment
+# Inputs: s, d0, d1
+# Output: y
+# Equation: y = NAND(NAND(d0, NAND(s, s)), NAND(d1, s))
+# -------------------------------------------------------------
+CIRCUIT mux2to1_nand
+INPUT s d0 d1
+OUTPUT y
+
+GATE g_sbar NAND s_bar s s
+GATE g_n0   NAND n0 d0 s_bar
+GATE g_n1   NAND n1 d1 s
+GATE g_out  NAND y  n0 n1
+
+END

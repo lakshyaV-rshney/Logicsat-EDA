@@ -106,8 +106,15 @@
 ├── examples/                # Sample gate-level netlists
 │   ├── full_adder_a.net     # Golden reference 1-bit full adder
 │   ├── full_adder_b.net     # Equivalent transformed full adder
-│   └── full_adder_buggy.net # Defective mutated full adder
+│   ├── full_adder_buggy.net # Defective mutated full adder
+│   ├── half_adder_a.net     # Golden half adder (XOR + AND)
+│   ├── half_adder_b.net     # Universal 5-NAND half adder implementation
+│   ├── mux2to1_a.net        # Standard 2:1 Multiplexer (AND-OR-NOT)
+│   ├── mux2to1_b.net        # All-NAND 2:1 Multiplexer implementation
+│   ├── demorgan_a.net       # De Morgan LHS: ~(a & b)
+│   └── demorgan_b.net       # De Morgan RHS: ~a | ~b
 ├── docs/                    # Academic project documentation
+│   ├── SY_BTECH_EXPLAINER_GUIDE.md # Comprehensive Viva Voce & Presentation Guide
 │   ├── PRD.md               # Product Requirements Document (Phase 1)
 │   └── ARD.md               # Architecture & Detailed Design (Phase 2)
 ├── Makefile                 # Cross-platform build automation
@@ -148,12 +155,32 @@ make clean-all
 
 ## 5. Usage Guide & Examples
 
-### 1. Combinational Equivalence Checking (CEC)
+### 1. Circuit Structural Explanation & Tseytin CNF Breakdown (Viva Demo Mode)
+
+Inspect circuit inputs, outputs, 3-color DFS cycle validation, logic gates, and synthesized Tseytin CNF clauses:
+
+```bash
+bin/logisat --explain examples/full_adder_a.net
+```
+
+### 2. Combinational Equivalence Checking (CEC)
 
 Verify whether an optimized netlist is functionally identical to the reference model:
 
 ```bash
 bin/logisat --equiv examples/full_adder_a.net examples/full_adder_b.net --output output/cec.rep
+```
+
+Verify universal NAND implementations against golden reference models:
+```bash
+# Half Adder (Golden XOR+AND vs 5-NAND Universal Implementation)
+bin/logisat --equiv examples/half_adder_a.net examples/half_adder_b.net
+
+# 2:1 Multiplexer (Standard vs All-NAND implementation)
+bin/logisat --equiv examples/mux2to1_a.net examples/mux2to1_b.net
+
+# De Morgan's First Law Proof: ~(A & B) == ~A | ~B
+bin/logisat --equiv examples/demorgan_a.net examples/demorgan_b.net
 ```
 
 *Output:*
@@ -170,22 +197,23 @@ Metrics: Time: 0.000 ms | Decisions: 7 | Backtracks: 7
 [+] Verification report exported to: output/cec.rep
 ```
 
-When verifying a defective netlist:
+When verifying a defective netlist, you can add `-v` (`--verbose`) to watch the DPLL solver make decisions, unit-propagate, detect conflicts, and backtrack:
 ```bash
-bin/logisat --equiv examples/full_adder_a.net examples/full_adder_buggy.net
+bin/logisat --equiv examples/full_adder_a.net examples/full_adder_buggy.net -v
 ```
 *Output:*
 ```
 ========================================================
   VERDICT: CIRCUITS ARE NON-EQUIVALENT [DISPROVEN]      
 ========================================================
-Counterexample input vector found:
-  a = 1
-  b = 0
-  cin = 1
+Explanation: Miter formula is SATISFIABLE (SAT).
+             Counterexample input vector found:
+               a = 1
+               b = 0
+               cin = 1
 ```
 
-### 2. Automatic Test Pattern Generation (ATPG)
+### 3. Automatic Test Pattern Generation (ATPG)
 
 Generate a test vector to detect a physical stuck-at-0 fault on net `sum`:
 
@@ -198,25 +226,40 @@ bin/logisat --fault examples/full_adder_a.net sum 0 --output output/fault.rep
 ========================================================
   VERDICT: FAULT IS TESTABLE                            
 ========================================================
-Test pattern vector:
+Sensitizing test pattern vector:
   a = 1
   b = 1
   cin = 1
 ```
 
-### 3. Solving Standalone DIMACS CNF Formulas
+### 4. Solving Standalone DIMACS CNF Formulas
 
 ```bash
-bin/logisat --dimacs benchmarks/simple_sat.cnf --output output/dimacs.rep
+bin/logisat --dimacs benchmarks/simple_sat.cnf --output output/dimacs.rep -v
 ```
 
-### 4. Interactive Mode
+### 5. Interactive Mode
 
 Running `logisat` without command-line arguments launches the interactive engineer terminal:
 
 ```bash
 bin/logisat
 ```
+
+---
+
+## 6. Viva Voce & Presentation Preparation Guide
+
+A comprehensive student guide tailored specifically for Second Year (SY) B.Tech students facing college viva voce evaluations and project defenses is available at:
+👉 **[`docs/SY_BTECH_EXPLAINER_GUIDE.md`](file:///d:/College/SY/Sem%203/Minor/MiniProj/docs/SY_BTECH_EXPLAINER_GUIDE.md)**
+
+It covers:
+* 30-Second Elevator Pitch.
+* Direct syllabus mappings to DSA, Digital Logic, and Discrete Mathematics.
+* Visual explanation of DPLL, BCP, Pure Literals, and DLIS.
+* Step-by-step whiteboard derivation of Tseytin gate transformations.
+* Top 20 Most Likely Viva Questions with ideal answers.
+* Live demonstration command cheat sheet.
 
 ---
 

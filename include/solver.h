@@ -21,6 +21,7 @@ typedef enum {
 typedef struct {
     bool enable_pure_literal;
     branching_heuristic_t heuristic;
+    bool verbose; /* If true, prints step-by-step DPLL execution trace for viva demo */
 } solver_config_t;
 
 typedef struct {

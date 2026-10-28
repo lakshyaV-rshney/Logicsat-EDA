@@ -1,0 +1,11 @@
+# -------------------------------------------------------------
+# De Morgan's First Law Verification (Circuit A: Left Hand Side)
+# Equation: LHS = ~(a & b)  (NAND gate)
+# -------------------------------------------------------------
+CIRCUIT demorgan_lhs
+INPUT a b
+OUTPUT y
+
+GATE g_nand NAND y a b
+
+END

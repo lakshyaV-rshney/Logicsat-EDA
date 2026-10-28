@@ -1,0 +1,13 @@
+# -------------------------------------------------------------
+# De Morgan's First Law Verification (Circuit B: Right Hand Side)
+# Equation: RHS = ~a | ~b   (Inverters feeding OR gate)
+# -------------------------------------------------------------
+CIRCUIT demorgan_rhs
+INPUT a b
+OUTPUT y
+
+GATE g_inv_a NOT na a
+GATE g_inv_b NOT nb b
+GATE g_or    OR  y  na nb
+
+END
