@@ -2,6 +2,7 @@
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 [![Language](https://img.shields.io/badge/language-C99-blue.svg)]()
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Testing](https://img.shields.io/badge/tests-12%2F12%20passed-success.svg)]()
 [![Standard](https://img.shields.io/badge/standard-ISO%20C99%20%2F%20C11-orange.svg)]()
 
@@ -281,6 +282,6 @@ The test suite (`make test`) covers all modules with 100% pass rate:
 
 ---
 
-## 7. License & Academic Integrity
+## 7. License & Author
 
-This project was developed as an individual mini-project submission for the **Programming Fundamentals and Software Engineering** course. It follows strict software engineering principles: modular C design, warning-free compilation under `-Wall -Wextra -pedantic`, gTest-style unit testing, and automated Makefile build workflows.
+Developed by **[Lakshya Varshney](https://github.com/lakshyaV-rshney/)** as a mini-project submission. Released under the open-source **[MIT License](LICENSE)**.
