@@ -1,22 +1,4 @@
-/**
- * ==============================================================================
- * LogiSAT Conjunctive Normal Form (CNF) Formula Data Structures
- * ==============================================================================
- * 
- * [SY B.TECH CURRICULUM CONCEPTS USED]:
- * 1. Data Structures:
- *    - Dynamic Array: Clause literals and formula clauses are stored as dynamic
- *      arrays with capacity doubling.
- * 2. Discrete Mathematics:
- *    - Literal representation:
- *      * Variable x (index >= 1): Positive literal 'x' is encoded as +x.
- *      * Negated variable: Negative literal 'not x' is encoded as -x.
- *      * Literal 0 is reserved as the DIMACS clause terminator.
- *    - Clause: A disjunction (OR) of literals: (l1 v l2 v ... v lk).
- *    - Formula: A conjunction (AND) of clauses: C1 ^ C2 ^ ... ^ Cm.
- * ==============================================================================
- */
-
+// cnf.c - CNF formula and clause operations
 #include <stdlib.h>
 #include <string.h>
 #include "cnf.h"
@@ -116,7 +98,6 @@ logisat_status_t cnf_formula_add_clause(cnf_formula_t *formula, clause_t *clause
 
     formula->clauses[formula->num_clauses++] = clause;
 
-    /* Update num_vars if clause introduces a higher variable index */
     for (size_t i = 0; i < clause->size; ++i) {
         int32_t lit = clause->literals[i];
         size_t var = (size_t)(lit > 0 ? lit : -lit);

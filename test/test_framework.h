@@ -1,3 +1,4 @@
+// test_framework.h - Minimalist unit testing framework
 #ifndef TEST_FRAMEWORK_H
 #define TEST_FRAMEWORK_H
 
@@ -80,7 +81,7 @@ static inline void register_test(const char *suite, const char *case_name, test_
 
 static inline int run_all_unit_tests(void) {
     printf("======================================================================\n");
-    printf("  Running LogiSAT Automated Google-Test Compatible Unit Test Suite    \n");
+    printf("  Running LogiSAT Unit Test Suite                                     \n");
     printf("======================================================================\n");
 
     g_tests_passed = 0;
@@ -110,4 +111,4 @@ static inline int run_all_unit_tests(void) {
     return (g_tests_failed == 0) ? 0 : 1;
 }
 
-#endif /* TEST_FRAMEWORK_H */
+#endif

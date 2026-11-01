@@ -1,3 +1,4 @@
+// reporter.c - Verification and benchmark report generator
 #include <stdio.h>
 #include <stdlib.h>
 #include "reporter.h"
@@ -62,7 +63,9 @@ logisat_status_t reporter_write_dimacs_summary(const char *path, const char *fil
     if (res == SOLVER_SAT && assign) {
         fprintf(fp, "Model: ");
         size_t lim = f->num_vars < 30 ? f->num_vars : 30;
-        for (size_t i = 1; i <= lim; ++i) fprintf(fp, "%d ", assign[i] == VAL_TRUE ? (int)i : -(int)i);
+        for (size_t i = 1; i <= lim; ++i) {
+            fprintf(fp, "%d ", assign[i] == VAL_TRUE ? (int)i : -(int)i);
+        }
         if (f->num_vars > 30) fprintf(fp, "... [truncated]");
         fprintf(fp, "\n");
     }

@@ -1,3 +1,4 @@
+// test_runner.c - Unit test suite for LogiSAT
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,9 +11,6 @@
 #include "solver.h"
 #include "verifier.h"
 
-/* -------------------------------------------------------------------------- */
-/* Suite 1: CNF Manipulation                                                  */
-/* -------------------------------------------------------------------------- */
 TEST(SuiteCNF, CreateAndAddLiterals) {
     clause_t *clause = clause_create(2);
     ASSERT_TRUE(clause != NULL);
@@ -49,9 +47,6 @@ TEST(SuiteCNF, FormulaAddAndClone) {
     cnf_formula_destroy(cloned);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Suite 2: DIMACS Loader & Exporter                                          */
-/* -------------------------------------------------------------------------- */
 TEST(SuiteDIMACS, SaveAndReloadRoundTrip) {
     cnf_formula_t *orig = cnf_formula_create(3, 2);
     int32_t c1[2] = { 1, -2 };
@@ -77,13 +72,9 @@ TEST(SuiteDIMACS, SaveAndReloadRoundTrip) {
     remove(tmp_path);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Suite 3: DPLL Solver Engine                                                */
-/* -------------------------------------------------------------------------- */
 TEST(SuiteSolver, TrivialSAT) {
-    /* (x1 v x2) */
     cnf_formula_t *f = cnf_formula_create(2, 1);
-    int32_t c1[2] = { 1, 2 };
+    int32_t c1[2] = { 1, -2 };
     cnf_formula_add_clause_lits(f, c1, 2);
 
     var_value_t assignments[3];
@@ -94,7 +85,6 @@ TEST(SuiteSolver, TrivialSAT) {
 }
 
 TEST(SuiteSolver, TrivialUNSAT) {
-    /* (x1) ^ (~x1) */
     cnf_formula_t *f = cnf_formula_create(1, 2);
     int32_t c1[1] = { 1 };
     int32_t c2[1] = { -1 };
@@ -108,7 +98,6 @@ TEST(SuiteSolver, TrivialUNSAT) {
 }
 
 TEST(SuiteSolver, UnitPropagationChain) {
-    /* (x1) ^ (~x1 v x2) ^ (~x2 v x3) -> SAT with x1=T, x2=T, x3=T */
     cnf_formula_t *f = cnf_formula_create(3, 3);
     int32_t c1[1] = { 1 };
     int32_t c2[2] = { -1, 2 };
@@ -131,18 +120,6 @@ TEST(SuiteSolver, UnitPropagationChain) {
 }
 
 TEST(SuiteSolver, PigeonholePrinciple_PHP_2_3_UNSAT) {
-    /* 3 pigeons in 2 holes:
-       Variables:
-       p11=1, p12=2
-       p21=3, p22=4
-       p31=5, p32=6
-       Every pigeon i in at least one hole:
-       (1 v 2), (3 v 4), (5 v 6)
-       No two pigeons in hole 1:
-       (~1 v ~3), (~1 v ~5), (~3 v ~5)
-       No two pigeons in hole 2:
-       (~2 v ~4), (~2 v ~6), (~4 v ~6)
-    */
     cnf_formula_t *f = cnf_formula_create(6, 9);
     int32_t p1[2] = { 1, 2 };
     int32_t p2[2] = { 3, 4 };
@@ -171,9 +148,6 @@ TEST(SuiteSolver, PigeonholePrinciple_PHP_2_3_UNSAT) {
     cnf_formula_destroy(f);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Suite 4: Netlist & Cycle Detection                                         */
-/* -------------------------------------------------------------------------- */
 TEST(SuiteNetlist, AcyclicPasses) {
     netlist_t *nl = netlist_create("dag");
     int32_t in1, in2, mid, out;
@@ -207,11 +181,7 @@ TEST(SuiteNetlist, CyclicLoopDetected) {
     netlist_destroy(nl);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Suite 5: Combinational Equivalence Checking (CEC)                          */
-/* -------------------------------------------------------------------------- */
 TEST(SuiteVerifier, DeMorganEquivalence_Proven) {
-    /* Circuit 1: Y = NAND(a, b) -> NOT(AND(a, b)) */
     netlist_t *nl1 = netlist_create("nand_gate");
     int32_t a1, b1, y1;
     netlist_add_net(nl1, "a", true, false, &a1);
@@ -220,7 +190,6 @@ TEST(SuiteVerifier, DeMorganEquivalence_Proven) {
     int32_t in1[2] = { a1, b1 };
     netlist_add_gate(nl1, GATE_NAND, y1, in1, 2);
 
-    /* Circuit 2: Y = OR(NOT(a), NOT(b)) */
     netlist_t *nl2 = netlist_create("de_morgan");
     int32_t a2, b2, na, nb, y2;
     netlist_add_net(nl2, "a", true, false, &a2);
@@ -245,7 +214,6 @@ TEST(SuiteVerifier, DeMorganEquivalence_Proven) {
 }
 
 TEST(SuiteVerifier, BuggyCircuit_DisprovenWithCounterexample) {
-    /* Circuit 1: Y = AND(a, b) */
     netlist_t *nl1 = netlist_create("and_gate");
     int32_t a1, b1, y1;
     netlist_add_net(nl1, "a", true, false, &a1);
@@ -254,7 +222,6 @@ TEST(SuiteVerifier, BuggyCircuit_DisprovenWithCounterexample) {
     int32_t in1[2] = { a1, b1 };
     netlist_add_gate(nl1, GATE_AND, y1, in1, 2);
 
-    /* Circuit 2 (Buggy): Y = OR(a, b) */
     netlist_t *nl2 = netlist_create("buggy_or");
     int32_t a2, b2, y2;
     netlist_add_net(nl2, "a", true, false, &a2);
@@ -273,11 +240,7 @@ TEST(SuiteVerifier, BuggyCircuit_DisprovenWithCounterexample) {
     netlist_destroy(nl2);
 }
 
-/* -------------------------------------------------------------------------- */
-/* Suite 6: Stuck-At Fault ATPG                                               */
-/* -------------------------------------------------------------------------- */
 TEST(SuiteATPG, DetectStuckAt0) {
-    /* Y = AND(a, b); Test s-a-0 on net 'a' -> Requires a=1, b=1 */
     netlist_t *nl = netlist_create("and_circuit");
     int32_t a, b, y;
     netlist_add_net(nl, "a", true, false, &a);
@@ -290,7 +253,6 @@ TEST(SuiteATPG, DetectStuckAt0) {
     EXPECT_EQ(verifier_generate_test_pattern(nl, "a", FAULT_STUCK_AT_0, NULL, &res), LOGISAT_OK);
     EXPECT_TRUE(res.is_testable);
 
-    /* Verification: test pattern must have both a=1 and b=1 to detect s-a-0 */
     for (size_t i = 0; i < res.num_inputs; ++i) {
         if (strcmp(res.input_names[i], "a") == 0 || strcmp(res.input_names[i], "b") == 0) {
             EXPECT_EQ(res.test_vector[i], VAL_TRUE);

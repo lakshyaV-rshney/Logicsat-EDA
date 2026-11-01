@@ -1,13 +1,10 @@
+// logisat_types.h - Core enumerations and types
 #ifndef LOGISAT_TYPES_H
 #define LOGISAT_TYPES_H
 
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef enum {
     VAL_FALSE       = -1,
@@ -38,8 +35,4 @@ typedef enum {
     FAULT_STUCK_AT_1
 } fault_type_t;
 
-#ifdef __cplusplus
-}
 #endif
-
-#endif /* LOGISAT_TYPES_H */

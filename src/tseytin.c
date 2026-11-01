@@ -1,10 +1,4 @@
-/**
- * ==============================================================================
- * LogiSAT Tseytin Transformation Engine (Compact & Clean Edition)
- * Maps circuit gates to linear O(N) CNF clauses.
- * ==============================================================================
- */
-
+// tseytin.c - Tseytin transformation from logic gates to CNF
 #include <stdlib.h>
 #include "tseytin.h"
 
@@ -54,7 +48,9 @@ logisat_status_t tseytin_encode_gate(gate_type_t type, int32_t out_var, const in
             if (num_inputs != 2) return LOGISAT_ERR_UNSUPPORTED_GATE;
             int32_t a = in_vars[0], b = in_vars[1], z = (type == GATE_XOR) ? out_var : -out_var;
             int32_t c[4][3] = { {-a, -b, -z}, {a, b, -z}, {a, -b, z}, {-a, b, z} };
-            for (int k = 0; k < 4; ++k) cnf_formula_add_clause_lits(formula, c[k], 3);
+            for (int k = 0; k < 4; ++k) {
+                cnf_formula_add_clause_lits(formula, c[k], 3);
+            }
             break;
         }
 

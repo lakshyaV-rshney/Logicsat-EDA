@@ -1,3 +1,4 @@
+// netlist.h - Structural gate-level netlist data structure and validation
 #ifndef LOGISAT_NETLIST_H
 #define LOGISAT_NETLIST_H
 
@@ -6,10 +7,6 @@
 #include <stdbool.h>
 #include "logisat_status.h"
 #include "logisat_types.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 #define MAX_NET_NAME_LEN 64
 
@@ -60,8 +57,4 @@ logisat_status_t netlist_validate_acyclic(const netlist_t *nl);
 const char *gate_type_to_string(gate_type_t type);
 gate_type_t gate_type_from_string(const char *str);
 
-#ifdef __cplusplus
-}
 #endif
-
-#endif /* LOGISAT_NETLIST_H */

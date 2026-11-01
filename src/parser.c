@@ -1,3 +1,4 @@
+// parser.c - Netlist lexical analyzer and parser
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,18 +25,13 @@ logisat_status_t parser_parse_netlist_file(const char *filepath, netlist_t **out
 
     char line[MAX_LINE_LEN];
     netlist_t *nl = NULL;
-    size_t line_num = 0;
 
     while (fgets(line, sizeof(line), fp)) {
-        line_num++;
         char *p = trim_whitespace(line);
-
-        /* Skip comments and empty lines */
         if (*p == '\0' || *p == '#' || (p[0] == '/' && p[1] == '/')) {
             continue;
         }
 
-        /* Tokenize by whitespace */
         char *keyword = strtok(p, " \t\r\n");
         if (!keyword) continue;
 
@@ -109,7 +105,6 @@ logisat_status_t parser_parse_netlist_file(const char *filepath, netlist_t **out
         return LOGISAT_ERR_PARSE_SYNTAX;
     }
 
-    /* Validate acyclicity */
     logisat_status_t cycle_check = netlist_validate_acyclic(nl);
     if (cycle_check != LOGISAT_OK) {
         netlist_destroy(nl);

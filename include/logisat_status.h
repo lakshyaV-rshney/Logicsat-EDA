@@ -1,9 +1,6 @@
+// logisat_status.h - Status and error codes
 #ifndef LOGISAT_STATUS_H
 #define LOGISAT_STATUS_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 
 typedef enum {
     LOGISAT_OK                      = 0,
@@ -19,9 +16,6 @@ typedef enum {
     LOGISAT_ERR_NETLIST_INCOMPATIBLE = 10
 } logisat_status_t;
 
-/**
- * @brief Returns a human-readable description for a status code.
- */
 static inline const char *logisat_status_to_string(logisat_status_t status) {
     switch (status) {
         case LOGISAT_OK:
@@ -51,8 +45,4 @@ static inline const char *logisat_status_to_string(logisat_status_t status) {
     }
 }
 
-#ifdef __cplusplus
-}
 #endif
-
-#endif /* LOGISAT_STATUS_H */

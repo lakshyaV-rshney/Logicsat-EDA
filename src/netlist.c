@@ -1,28 +1,4 @@
-/**
- * ==============================================================================
- * LogiSAT Netlist Graph Representation & Topological DAG Validation
- * ==============================================================================
- * 
- * [SY B.TECH CURRICULUM CONCEPTS USED]:
- * 1. Data Structures:
- *    - Dynamic Array Growth: Using doubling capacity strategy (16 -> 32 -> 64)
- *      to achieve amortized O(1) insertion of nets and gates.
- * 2. Graph Algorithms:
- *    - Directed Graph: Nets are vertices, gates are directed hyperedges connecting
- *      input nets to an output net.
- *    - Cycle Detection via 3-Color DFS:
- *      * State 0 (WHITE): Node not yet visited.
- *      * State 1 (GRAY):  Node is on the current active DFS recursion call stack.
- *      * State 2 (BLACK): Node and all its downstream descendants are fully explored.
- *      If DFS ever encounters an adjacent node in State 1 (GRAY), a back-edge exists,
- *      which mathematically proves a directed cycle!
- * 3. Digital Logic Design:
- *    - Combinational circuits MUST be Directed Acyclic Graphs (DAGs).
- *    - A feedback loop would turn the circuit into a sequential latch or cause oscillations,
- *      making static combinational equivalence invalid.
- * ==============================================================================
- */
-
+// netlist.c - Netlist graph construction and cycle validation
 #include <stdlib.h>
 #include <string.h>
 #include "netlist.h"
@@ -59,7 +35,8 @@ static bool grow_arr(void **arr, size_t *cap, size_t count, size_t elem_size) {
         size_t ncap = *cap ? *cap * 2 : 8;
         void *p = realloc(*arr, ncap * elem_size);
         if (!p) return false;
-        *arr = p; *cap = ncap;
+        *arr = p;
+        *cap = ncap;
     }
     return true;
 }
@@ -74,7 +51,9 @@ netlist_t *netlist_create(const char *name) {
 void netlist_destroy(netlist_t *nl) {
     if (!nl) return;
     free(nl->nets);
-    for (size_t i = 0; i < nl->num_gates; ++i) free(nl->gates[i].input_nets);
+    for (size_t i = 0; i < nl->num_gates; ++i) {
+        free(nl->gates[i].input_nets);
+    }
     free(nl->gates);
     free(nl->primary_inputs);
     free(nl->primary_outputs);
@@ -92,18 +71,26 @@ logisat_status_t netlist_add_net(netlist_t *nl, const char *name, bool is_in, bo
         }
     }
 
-    if (!grow_arr((void**)&nl->nets, &nl->net_capacity, nl->num_nets, sizeof(circuit_net_t))) return LOGISAT_ERR_OUT_OF_MEMORY;
+    if (!grow_arr((void**)&nl->nets, &nl->net_capacity, nl->num_nets, sizeof(circuit_net_t))) {
+        return LOGISAT_ERR_OUT_OF_MEMORY;
+    }
     int32_t id = (int32_t)(++nl->num_nets);
     circuit_net_t *net = &nl->nets[id - 1];
     strncpy(net->name, name, sizeof(net->name) - 1);
-    net->id = id; net->is_primary_input = is_in; net->is_primary_output = is_out;
+    net->id = id;
+    net->is_primary_input = is_in;
+    net->is_primary_output = is_out;
 
     if (is_in) {
-        if (!grow_arr((void**)&nl->primary_inputs, &nl->pi_capacity, nl->num_primary_inputs, sizeof(int32_t))) return LOGISAT_ERR_OUT_OF_MEMORY;
+        if (!grow_arr((void**)&nl->primary_inputs, &nl->pi_capacity, nl->num_primary_inputs, sizeof(int32_t))) {
+            return LOGISAT_ERR_OUT_OF_MEMORY;
+        }
         nl->primary_inputs[nl->num_primary_inputs++] = id;
     }
     if (is_out) {
-        if (!grow_arr((void**)&nl->primary_outputs, &nl->po_capacity, nl->num_primary_outputs, sizeof(int32_t))) return LOGISAT_ERR_OUT_OF_MEMORY;
+        if (!grow_arr((void**)&nl->primary_outputs, &nl->po_capacity, nl->num_primary_outputs, sizeof(int32_t))) {
+            return LOGISAT_ERR_OUT_OF_MEMORY;
+        }
         nl->primary_outputs[nl->num_primary_outputs++] = id;
     }
     if (out_id) *out_id = id;
@@ -129,34 +116,42 @@ const char *netlist_get_net_name(const netlist_t *nl, int32_t net_id) {
 logisat_status_t netlist_add_gate(netlist_t *nl, gate_type_t type, int32_t out_net, const int32_t *inputs, size_t n_in) {
     if (!nl || (!inputs && n_in > 0)) return LOGISAT_ERR_NULL_PTR;
     if (out_net <= 0 || (size_t)out_net > nl->num_nets) return LOGISAT_ERR_INVALID_VARIABLE;
-    if (!grow_arr((void**)&nl->gates, &nl->gate_capacity, nl->num_gates, sizeof(circuit_gate_t))) return LOGISAT_ERR_OUT_OF_MEMORY;
+    if (!grow_arr((void**)&nl->gates, &nl->gate_capacity, nl->num_gates, sizeof(circuit_gate_t))) {
+        return LOGISAT_ERR_OUT_OF_MEMORY;
+    }
 
     circuit_gate_t *g = &nl->gates[nl->num_gates++];
-    g->type = type; g->output_net = out_net; g->num_inputs = n_in;
+    g->type = type;
+    g->output_net = out_net;
+    g->num_inputs = n_in;
     g->input_nets = (int32_t *)malloc(sizeof(int32_t) * (n_in > 0 ? n_in : 1));
     if (!g->input_nets) return LOGISAT_ERR_OUT_OF_MEMORY;
-    for (size_t i = 0; i < n_in; ++i) g->input_nets[i] = inputs[i];
+    for (size_t i = 0; i < n_in; ++i) {
+        g->input_nets[i] = inputs[i];
+    }
     return LOGISAT_OK;
 }
 
-/* 3-Color DFS Cycle detection */
 static bool dfs_has_cycle(int32_t node, const netlist_t *nl, int *state) {
-    state[node] = 1; /* Gray (visiting) */
+    state[node] = 1;
 
     for (size_t i = 0; i < nl->num_gates; ++i) {
         const circuit_gate_t *g = &nl->gates[i];
         bool is_in = false;
         for (size_t j = 0; j < g->num_inputs; ++j) {
-            if (g->input_nets[j] == node) { is_in = true; break; }
+            if (g->input_nets[j] == node) {
+                is_in = true;
+                break;
+            }
         }
         if (is_in) {
             int32_t next = g->output_net;
-            if (state[next] == 1) return true; /* Cycle found! */
+            if (state[next] == 1) return true;
             if (state[next] == 0 && dfs_has_cycle(next, nl, state)) return true;
         }
     }
 
-    state[node] = 2; /* Black (visited) */
+    state[node] = 2;
     return false;
 }
 

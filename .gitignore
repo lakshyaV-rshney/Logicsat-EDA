@@ -2,9 +2,6 @@
 build/
 bin/
 *.o
-*.exe
-external/googletest/*.o
-external/googletest/*.a
 
 # Verification output files and reports
 output/
@@ -12,7 +9,11 @@ output/
 *.out
 tmp_test*
 
-# Editor directories
+# Optional external dependencies
+external/
+
+# Editor and OS directories
 .vscode/
 .idea/
 *.swp
+.DS_Store

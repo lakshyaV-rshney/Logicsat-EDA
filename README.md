@@ -6,7 +6,7 @@
 [![Testing](https://img.shields.io/badge/tests-12%2F12%20passed-success.svg)]()
 [![Standard](https://img.shields.io/badge/standard-ISO%20C99%20%2F%20C11-orange.svg)]()
 
-> **LogiSAT** is an industrial-grade, modular Electronic Design Automation (EDA) verification engine written in ISO C99. It combines structural gate-level netlist parsing, linear-size Tseytin CNF transformations, and an optimized Davis-Putnam-Logemann-Loveland (DPLL) Boolean Satisfiability (SAT) solver to formally verify combinational circuit equivalence and generate Automatic Test Patterns (ATPG) for single stuck-at faults.
+> **LogiSAT** is a modular Electronic Design Automation (EDA) verification engine written in ISO C99. It combines structural gate-level netlist parsing, linear-size Tseytin CNF transformations, and an optimized Davis-Putnam-Logemann-Loveland (DPLL) Boolean Satisfiability (SAT) solver to formally verify combinational circuit equivalence and generate Automatic Test Patterns (ATPG) for single stuck-at faults.
 
 ---
 
@@ -115,10 +115,9 @@
 │   ├── demorgan_a.net       # De Morgan LHS: ~(a & b)
 │   └── demorgan_b.net       # De Morgan RHS: ~a | ~b
 ├── docs/                    # Academic project documentation
-│   ├── SY_BTECH_EXPLAINER_GUIDE.md # Comprehensive Viva Voce & Presentation Guide
 │   ├── PRD.md               # Product Requirements Document (Phase 1)
 │   └── ARD.md               # Architecture & Detailed Design (Phase 2)
-├── Makefile                 # Cross-platform build automation
+├── Makefile                 # Linux build automation
 └── README.md
 ```
 
@@ -126,9 +125,16 @@
 
 ## 4. Build and Execution
 
-### Prerequisites
-* GCC (`gcc` supporting ISO C99)
-* GNU Make (`make`)
+### Prerequisites (Ubuntu 22.04 LTS / Linux)
+
+LogiSAT is written in strict ISO C99 with **zero external dependencies**. On a fresh Ubuntu 22.04 LTS installation, only standard build tools are required:
+
+```bash
+sudo apt update && sudo apt install -y build-essential
+```
+
+* **C Compiler**: GCC (`gcc` supporting ISO C99: `-std=c99`)
+* **Build System**: GNU Make (`make`)
 
 ### Build Commands
 
@@ -156,7 +162,7 @@ make clean-all
 
 ## 5. Usage Guide & Examples
 
-### 1. Circuit Structural Explanation & Tseytin CNF Breakdown (Viva Demo Mode)
+### 1. Circuit Structural Explanation & Tseytin CNF Breakdown (Demo Mode)
 
 Inspect circuit inputs, outputs, 3-color DFS cycle validation, logic gates, and synthesized Tseytin CNF clauses:
 
@@ -174,7 +180,7 @@ bin/logisat --equiv examples/full_adder_a.net examples/full_adder_b.net --output
 
 Verify universal NAND implementations against golden reference models:
 ```bash
-# Half Adder (Golden XOR+AND vs 5-NAND Universal Implementation)
+# Half Adder (XOR+AND vs 5-NAND Universal Implementation)
 bin/logisat --equiv examples/half_adder_a.net examples/half_adder_b.net
 
 # 2:1 Multiplexer (Standard vs All-NAND implementation)
@@ -249,21 +255,6 @@ bin/logisat
 
 ---
 
-## 6. Viva Voce & Presentation Preparation Guide
-
-A comprehensive student guide tailored specifically for Second Year (SY) B.Tech students facing college viva voce evaluations and project defenses is available at:
-👉 **[`docs/SY_BTECH_EXPLAINER_GUIDE.md`](file:///d:/College/SY/Sem%203/Minor/MiniProj/docs/SY_BTECH_EXPLAINER_GUIDE.md)**
-
-It covers:
-* 30-Second Elevator Pitch.
-* Direct syllabus mappings to DSA, Digital Logic, and Discrete Mathematics.
-* Visual explanation of DPLL, BCP, Pure Literals, and DLIS.
-* Step-by-step whiteboard derivation of Tseytin gate transformations.
-* Top 20 Most Likely Viva Questions with ideal answers.
-* Live demonstration command cheat sheet.
-
----
-
 ## 6. Unit Testing Strategy
 
 The test suite (`make test`) covers all modules with 100% pass rate:
@@ -284,4 +275,4 @@ The test suite (`make test`) covers all modules with 100% pass rate:
 
 ## 7. License & Author
 
-Developed by **[Lakshya Varshney](https://github.com/lakshyaV-rshney/)** as a mini-project submission. Released under the open-source **[MIT License](LICENSE)**.
+Developed by **[Lakshya Varshney](https://github.com/lakshyaV-rshney/)**. Released under the open-source **[MIT License](LICENSE)**.
