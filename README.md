@@ -5,6 +5,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Testing](https://img.shields.io/badge/tests-12%2F12%20passed-success.svg)]()
 [![Standard](https://img.shields.io/badge/standard-ISO%20C99%20%2F%20C11-orange.svg)]()
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24085901.svg)](https://doi.org/10.5281/zenodo.24085901)
 
 > **LogiSAT** is a modular Electronic Design Automation (EDA) verification engine written in ISO C99. It combines structural gate-level netlist parsing, linear-size Tseytin CNF transformations, and an optimized Davis-Putnam-Logemann-Loveland (DPLL) Boolean Satisfiability (SAT) solver to formally verify combinational circuit equivalence and generate Automatic Test Patterns (ATPG) for single stuck-at faults.
 
